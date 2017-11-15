@@ -2,16 +2,16 @@
 #include <chrono>
 #include <omp.h>
 
-#define MAT_ROWS 250
-#define MAT_COLS 250
+#define MAT_ROWS 1000
+#define MAT_COLS 1000
 
-std::chrono::duration<double> naiveMult(int (&mA)[MAT_ROWS][MAT_COLS], int (&mB)[MAT_ROWS][MAT_COLS], int (&result)[MAT_ROWS][MAT_COLS]){
+std::chrono::duration<double> naiveMult(int *mA, int *mB, int *result){
     //Do the multiplication C = A * B (naive implementation)
     auto sTime = std::chrono::steady_clock::now(); //start timer
     for(int i = 0; i < MAT_ROWS; i++){
         for(int j = 0; j < MAT_COLS; j++){
-            for(int k = 0; k < MAT_COLS; k++){
-                result[i][j] += mA[i][k] * mB[k][j];
+            for(int k = 0; k < MAT_ROWS; k++){
+                result[i*MAT_COLS+j] += mA[i*MAT_COLS+k] * mB[k*MAT_COLS+j];
             }
         }
     }
@@ -20,14 +20,14 @@ std::chrono::duration<double> naiveMult(int (&mA)[MAT_ROWS][MAT_COLS], int (&mB)
     return naiveTime;
 }
 
-std::chrono::duration<double> parallelNaiveMult(int (&mA)[MAT_ROWS][MAT_COLS], int (&mB)[MAT_ROWS][MAT_COLS], int (&result)[MAT_ROWS][MAT_COLS]){
+std::chrono::duration<double> parallelNaiveMult(int *mA, int *mB, int *result){
     //Do the multiplication C = A * B (parallel naive implementation)
     auto sTime = std::chrono::steady_clock::now(); //start timer
     #pragma omp parrallel for
     for(int i = 0; i < MAT_ROWS; i++){
         for(int j = 0; j < MAT_COLS; j++){
-            for(int k = 0; k < MAT_COLS; k++){
-                result[i][j] += mA[i][k] * mB[k][j];
+            for(int k = 0; k < MAT_ROWS; k++){
+                result[i*MAT_COLS+j] += mA[i*MAT_COLS+k] * mB[k*MAT_COLS+j];
             }
         }
     }
@@ -36,34 +36,57 @@ std::chrono::duration<double> parallelNaiveMult(int (&mA)[MAT_ROWS][MAT_COLS], i
     return naiveTime;
 }
 
-void displayMatrices(int (&mA)[MAT_ROWS][MAT_COLS], int (&mB)[MAT_ROWS][MAT_COLS], int (&result)[MAT_ROWS][MAT_COLS]){
+std::chrono::duration<double> tiledMult(int *mA, int *mB, int *result){
+    //Do the multiplication C = A * B (tiled implementation)
+    int tileSize = 64;
+    auto sTime = std::chrono::steady_clock::now(); //start timer
+    #pragma omp parallel for
+    for(int i = 0; i < MAT_ROWS; i+=tileSize){
+        for(int j = 0; j < MAT_COLS; j+=tileSize){
+            for(int k = 0; k < MAT_ROWS; k+=tileSize){
+                for(int x = i; x < std::min(i + tileSize, MAT_ROWS); x++){
+                    for(int y = j; y < std::min(j + tileSize, MAT_COLS); y++){
+                        for(int z = k; z < std::min(k + tileSize, MAT_ROWS); z++){
+                            result[x*MAT_COLS+y] += mA[x*MAT_COLS+z] * mB[z*MAT_COLS+y];
+                        }
+                    }
+                }
+            }
+        }
+    }
+    auto eTime = std::chrono::steady_clock::now(); //stop timer
+    std::chrono::duration<double> naiveTime = eTime - sTime;
+    return naiveTime;
+}
+
+void displayMatrices(int *mA, int *mB, int *result){
     std::cout << "Matrix A" << std::endl;
     for(int i = 0; i < MAT_ROWS; i++){
         for(int j = 0; j < MAT_COLS; j++){
-            std::cout << mA[i][j] << " ";
+            std::cout << mA[i*MAT_COLS+j] << " ";
         }
         std::cout << std::endl;
     }
     std::cout << std::endl << "Matrix B" << std::endl;
     for(int i = 0; i < MAT_ROWS; i++){
         for(int j = 0; j < MAT_COLS; j++){
-            std::cout << mB[i][j] << " ";
+            std::cout << mB[i*MAT_COLS+j] << " ";
         }
         std::cout << std::endl;
     }
     std::cout << std::endl << "Result Matrix" << std::endl;
     for(int i = 0; i < MAT_ROWS; i++){
         for(int j = 0; j < MAT_COLS; j++){
-            std::cout << result[i][j] << " ";
+            std::cout << result[i*MAT_COLS+j] << " ";
         }
         std::cout << std::endl;
     }
 }
 
 int main() {
-    int matA[MAT_ROWS][MAT_COLS];
-    int matB[MAT_ROWS][MAT_COLS];
-    int matC[MAT_ROWS][MAT_COLS];
+    int *matA = new int[MAT_ROWS*MAT_COLS];
+    int *matB = new int[MAT_ROWS*MAT_COLS];
+    int *matC = new int[MAT_ROWS*MAT_COLS];
 
     srand(time(NULL));
 
@@ -72,9 +95,9 @@ int main() {
         for(int j = 0; j < MAT_COLS; j++){
             int valA = rand() % 20 + 1;
             int valB = rand() % 20 + 1;
-            matA[i][j] = valA;
-            matB[i][j] = valB;
-            matC[i][j] = 0;
+            matA[i*MAT_COLS+j] = valA;
+            matB[i*MAT_COLS+j] = valB;
+            matC[i*MAT_COLS+j] = 0;
         }
     }
 
@@ -84,10 +107,14 @@ int main() {
     //Run and time the parallel naive implementation
     std::chrono::duration<double> parallelNaiveTime = parallelNaiveMult(matA, matB, matC);
 
+    //Run and time tiled implementation
+    std::chrono::duration<double> tiledTime = tiledMult(matA, matB, matC);
+
     //Display the results
     //displayMatrices(matA, matB, matC);
     std::cout << std::endl << "Computation time (naive): " << naiveTime.count() << "s" << std::endl;
-    std::cout << std::endl << "Computation time (parallel naive): " << parallelNaiveTime.count() << "s" << std::endl;
+    std::cout << "Computation time (parallel naive): " << parallelNaiveTime.count() << "s" << std::endl;
+    std::cout << "Computation time (tiled): " << tiledTime.count() << "s" << std::endl;
 
    return 0;
 }
