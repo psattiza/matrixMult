@@ -59,6 +59,29 @@ std::chrono::duration<double> tiledMult(int *mA, int *mB, int *result){
     return naiveTime;
 }
 
+std::chrono::duration<double> customMult(int *mA, int *mB, int *result){
+    //Do the multiplication C = A * B (tiled implementation)
+    int tileSize = 64;
+    auto sTime = std::chrono::steady_clock::now(); //start timer
+    #pragma omp parallel for schedule(guided)
+    for(int i = 0; i < MAT_ROWS; i+=tileSize){
+        for(int j = 0; j < MAT_COLS; j+=tileSize){
+            for(int k = 0; k < MAT_ROWS; k+=tileSize){
+                for(int x = i; x < std::min(i + tileSize, MAT_ROWS); x++){
+                    for(int y = j; y < std::min(j + tileSize, MAT_COLS); y++){
+                        for(int z = k; z < std::min(k + tileSize, MAT_ROWS); z++){
+                            result[x*MAT_COLS+y] += mA[x*MAT_COLS+z] * mB[z*MAT_COLS+y];
+                        }
+                    }
+                }
+            }
+        }
+    }
+    auto eTime = std::chrono::steady_clock::now(); //stop timer
+    std::chrono::duration<double> naiveTime = eTime - sTime;
+    return naiveTime;
+}
+
 void displayMatrices(int *mA, int *mB, int *result){
     std::cout << "Matrix A" << std::endl;
     for(int i = 0; i < MAT_ROWS; i++){
@@ -110,11 +133,15 @@ int main() {
     //Run and time tiled implementation
     std::chrono::duration<double> tiledTime = tiledMult(matA, matB, matC);
 
+    //Run and time our implementation
+    std::chrono::duration<double> customTime = customMult(matA, matB, matC);
+
     //Display the results
     //displayMatrices(matA, matB, matC);
     std::cout << std::endl << "Computation time (naive): " << naiveTime.count() << "s" << std::endl;
     std::cout << "Computation time (parallel naive): " << parallelNaiveTime.count() << "s" << std::endl;
     std::cout << "Computation time (tiled): " << tiledTime.count() << "s" << std::endl;
+    std::cout << "Computation time (our implementation): " << customTime.count() << "s" << std::endl;
 
    return 0;
 }
