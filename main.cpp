@@ -22,7 +22,7 @@ int main() {
     }
 
     //Do the multiplication C = A * B (naive implementation)
-    auto sTime = std::chrono::high_resolution_clock::now(); //start timer
+    auto sTime = std::chrono::steady_clock::now(); //start timer
     for(int i = 0; i < MAT_ROWS; i++){
         for(int j = 0; j < MAT_COLS; j++){
             for(int k = 0; k < MAT_COLS; k++){
@@ -31,7 +31,7 @@ int main() {
             }
         }
     }
-    auto eTime = std::chrono::high_resolution_clock::now(); //stop timer
+    auto eTime = std::chrono::steady_clock::now(); //stop timer
     std::chrono::duration<double> naiveTime = eTime - sTime;
 
     //Display the results
