@@ -4,8 +4,8 @@
 #include <stdio.h>
 #include <immintrin.h>
 
-#define MAT_ROWS 1000
-#define MAT_COLS 1000
+#define MAT_ROWS 1024
+#define MAT_COLS 1024
 
 std::chrono::duration<double> naiveMult(int *mA, int *mB, int *result){
     //Do the multiplication C = A * B (naive implementation)
@@ -102,22 +102,7 @@ std::chrono::duration<double> tiledMultTranspose(int *mA, int *mB, int *result){
 
 std::chrono::duration<double> customMult(int (&mA)[MAT_ROWS][MAT_COLS], int (&mB)[MAT_ROWS][MAT_COLS], int (&result)[MAT_ROWS][MAT_COLS]){
     //Do the multiplication C = A * B (custom implementation using tiling and special AVX instructions)
-    //int tileSize = 64;
     auto sTime = std::chrono::steady_clock::now(); //start timer
-    /*#pragma omp parallel for schedule(guided)
-    for(int i = 0; i < MAT_ROWS; i+=tileSize){
-        for(int j = 0; j < MAT_COLS; j+=tileSize){
-            for(int k = 0; k < MAT_ROWS; k+=tileSize){
-                for(int x = i; x < std::min(i + tileSize, MAT_ROWS); x++){
-                    for(int y = j; y < std::min(j + tileSize, MAT_COLS); y++){
-                        for(int z = k; z < std::min(k + tileSize, MAT_ROWS); z++){
-                            result[x*MAT_COLS+y] += mA[x*MAT_COLS+z] * mB[z*MAT_COLS+y];
-                        }
-                    }
-                }
-            }
-        }
-    }*/
     unsigned int mc = MAT_COLS;
     size_t s1 = std::min(512u, mc);
     size_t s2 = std::min(24u, mc);
@@ -133,7 +118,7 @@ std::chrono::duration<double> customMult(int (&mA)[MAT_ROWS][MAT_COLS], int (&mB
                     }
                     else{
                         sumA1 = _mm256_load_si256((__m256i*)&result[i][j]);
-                        sumB2 = _mm256_load_si256((__m256i*)&result[i][j+8]);
+                        sumB1 = _mm256_load_si256((__m256i*)&result[i][j+8]);
                         sumA2 = _mm256_load_si256((__m256i*)&result[i+1][j]);
                         sumB2 = _mm256_load_si256((__m256i*)&result[i+1][j+8]);
                     }
@@ -150,7 +135,7 @@ std::chrono::duration<double> customMult(int (&mA)[MAT_ROWS][MAT_COLS], int (&mB
                     }
                     _mm256_storeu_si256((__m256i*)&result[i][j], sumA1);
                     _mm256_storeu_si256((__m256i*)&result[i][j+8], sumB1);
-                    _mm256_storeu_si256((__m256i*)&result[i][j+8], sumA2);
+                    _mm256_storeu_si256((__m256i*)&result[i+1][j], sumA2);
                     _mm256_storeu_si256((__m256i*)&result[i+1][j+8], sumB2);
                 }
             }
@@ -180,7 +165,8 @@ void displayMatrices(int *mA, int *mB, int *result){
     std::cout << std::endl << "Result Matrix" << std::endl;
     for(int i = 0; i < MAT_ROWS; i++){
         for(int j = 0; j < MAT_COLS; j++){
-            std::cout << result[i*MAT_COLS+j] << " ";
+            //std::cout << result[i*MAT_COLS+j] << " ";
+            printf("%4d ", result[i*MAT_COLS+j]);
         }
         std::cout << std::endl;
     }
@@ -194,6 +180,16 @@ bool compare2(int *a, int *b){
     return true;
 }
 
+bool compareC(int (&a)[MAT_ROWS][MAT_COLS], int *b){
+    for(int row = 0; row < MAT_ROWS; row++)
+        for(int col = 0; col < MAT_COLS; col++)
+            if(a[row][col] != b[row*MAT_ROWS + col]) {
+                printf("row: %d, col: %d vals: %d, %d \n", row, col, a[row][col], b[row * MAT_ROWS + col]);
+                return false;
+            }
+    return true;
+}
+
 bool printMatrix(int *a){
     for(int row = 0; row < MAT_ROWS; row++){
         for(int col = 0; col < MAT_COLS; col++)
@@ -203,9 +199,12 @@ bool printMatrix(int *a){
     std::cout << std::endl;
 }
 
+int matA2d[MAT_ROWS][MAT_COLS];
+int matB2d[MAT_ROWS][MAT_COLS];
+int matC2d[MAT_ROWS][MAT_COLS];
+
 int main() {
     omp_set_num_threads(4);
-    std::cout << "Declaring old arrays..." << std::endl;
     int *matA = new int[MAT_ROWS*MAT_COLS];
     int *matB = new int[MAT_ROWS*MAT_COLS];
     int *matC = new int[MAT_ROWS*MAT_COLS];
@@ -216,15 +215,7 @@ int main() {
     int *matC5 = new int[MAT_ROWS*MAT_COLS];
     int *matBTrans = new int[MAT_ROWS*MAT_COLS];
 
-    std::cout << "Declaring new arrays..." << std::endl;
-
-    int matA2d[MAT_ROWS][MAT_COLS];
-    int matB2d[MAT_ROWS][MAT_COLS];
-    int matC2d[MAT_ROWS][MAT_COLS] = {{0}};
-
     srand(time(NULL));
-
-    std::cout << "Initializing matrices..." << std::endl;
 
     //Fill matrices with random values between 1 and 20, or 0 for result matrix
     #pragma omp parallel for schedule(guided)
@@ -238,7 +229,7 @@ int main() {
             matC[i*MAT_COLS+j] = 0;
             matA2d[i][j] = valA;
             matB2d[i][j] = valB;
-            //matC2d[i][j] = 0;
+            matC2d[i][j] = 0;
         }
     }
 
@@ -247,7 +238,9 @@ int main() {
     //Run and time the naive implementation
     std::cout << "Using naive..." << std::endl;
     std::chrono::duration<double> naiveTime = naiveMult(matA, matB, matC);
+    std::cout << "Computation time (naive): " << naiveTime.count() << "s" << std::endl;
     std::chrono::duration<double> naiveTransposeTime = naiveMultTranspose(matA, matBTrans, matC4);
+    std::cout << "Computation time (transpose naive): " << naiveTransposeTime.count() << "s" << std::endl;
 
     //Run and time the parallel naive implementation
     std::cout << "Using parallel naive..." << std::endl;
@@ -261,35 +254,16 @@ int main() {
     std::cout << "Computation time (tiled): " << tiledTime.count() << "s" << std::endl;
 
     //Run and time our implementation
-    //std::cout << "Using custom..." << std::endl;
-    //std::chrono::duration<double> customTime = customMult(matA2d, matB2d, matC2d);
-    //std::cout << "Computation time (our implementation): " << customTime.count() << "s" << std::endl;
-
+    std::cout << "Using custom..." << std::endl;
+    std::chrono::duration<double> customTime = customMult(matA2d, matB2d, matC2d);
+    std::cout << "Computation time (our implementation): " << customTime.count() << "s" << std::endl;
 
     std::cout << std::endl << "Validating..." << std::endl;
     std::cout << std::boolalpha << "Transpose validating: " << compare2(matC, matC4) << std::endl;
-    //printMatrix(matA);
-    //printMatrix(matB);
-    //printMatrix(matBTrans);
-    //printMatrix(matC);
-    //printMatrix(matC4);
     std::cout << std::boolalpha << "Parallel validating: " << compare2(matC, matC1) << std::endl;
     std::cout << std::boolalpha << "Tiled validating: " << compare2(matC, matC2) << std::endl;
     std::cout << std::boolalpha << "Tiled transpose validating: " << compare2(matC, matC5) << std::endl;
-    std::cout << std::boolalpha << "Custom validating: " << compare2(matC, matC3) << std::endl;
-
-    //Display the results
-    //displayMatrices(matA, matB, matC);
-    std::cout << std::endl << "Computation time (naive): " << naiveTime.count() << "s" << std::endl;
-    std::cout << "Computation time (transpose naive): " << naiveTransposeTime.count() << "s" << std::endl;
-    std::cout << "Computation time (parallel naive): " << parallelNaiveTime.count() << "s" << std::endl;
-    std::cout << "Computation time (tiled): " << tiledTime.count() << "s" << std::endl;
-    std::cout << "Computation time (transposed tiled): " << tiledTimeTranspose.count() << "s" << std::endl;
-    //std::cout << "Computation time (our implementation): " << customTime.count() << "s" << std::endl;
-    //std::cout << std::boolalpha << "N v C " << compare2(matC, matC3) << std::endl;
-
-    //Display the results
-    //displayMatrices(matA, matB, matC);
+    std::cout << std::boolalpha << "Custom validating: " << compareC(matC2d, matC) << std::endl;
 
    return 0;
 }
