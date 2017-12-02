@@ -60,7 +60,7 @@ std::chrono::duration<double> tiledMult(int *mA, int *mB, int *result){
 }
 
 std::chrono::duration<double> customMult(int *mA, int *mB, int *result){
-    //Do the multiplication C = A * B (tiled implementation)
+    //Do the multiplication C = A * B (custom implementation)
     int tileSize = 64;
     auto sTime = std::chrono::steady_clock::now(); //start timer
     #pragma omp parallel for schedule(guided)
@@ -110,6 +110,7 @@ int main() {
     int *matA = new int[MAT_ROWS*MAT_COLS];
     int *matB = new int[MAT_ROWS*MAT_COLS];
     int *matC = new int[MAT_ROWS*MAT_COLS];
+    int *matBTrans = new int[MAT_ROWS*MAT_COLS];
 
     srand(time(NULL));
 
@@ -120,6 +121,7 @@ int main() {
             int valB = rand() % 20 + 1;
             matA[i*MAT_COLS+j] = valA;
             matB[i*MAT_COLS+j] = valB;
+            matBTrans[j*MAT_COLS+i] = valB;
             matC[i*MAT_COLS+j] = 0;
         }
     }
