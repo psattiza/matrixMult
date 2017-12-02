@@ -114,7 +114,10 @@ int main() {
 
     srand(time(NULL));
 
+    std::cout << "Initializing matrices..." << std::endl;
+
     //Fill matrices with random values between 1 and 20, or 0 for result matrix
+    #pragma omp parallel for schedule(guided)
     for(int i = 0; i < MAT_ROWS; i++){
         for(int j = 0; j < MAT_COLS; j++){
             int valA = rand() % 20 + 1;
@@ -125,6 +128,8 @@ int main() {
             matC[i*MAT_COLS+j] = 0;
         }
     }
+
+    std::cout << "Performing multiplications..." << std::endl;
 
     //Run and time the naive implementation
     std::chrono::duration<double> naiveTime = naiveMult(matA, matB, matC);
