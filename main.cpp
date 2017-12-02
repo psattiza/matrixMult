@@ -106,10 +106,21 @@ void displayMatrices(int *mA, int *mB, int *result){
     }
 }
 
+bool compare2(int *a, int *b){
+    for(int row = 0; row < MAT_ROWS; row++)
+        for(int col = 0; col < MAT_COLS; col++)
+            if(a[row*MAT_ROWS + col] != b[row*MAT_ROWS + col])        
+                return false;
+    return true;
+}
+
 int main() {
     int *matA = new int[MAT_ROWS*MAT_COLS];
     int *matB = new int[MAT_ROWS*MAT_COLS];
     int *matC = new int[MAT_ROWS*MAT_COLS];
+    int *matC1 = new int[MAT_ROWS*MAT_COLS];
+    int *matC2 = new int[MAT_ROWS*MAT_COLS];
+    int *matC3 = new int[MAT_ROWS*MAT_COLS];
 
     srand(time(NULL));
 
@@ -128,13 +139,17 @@ int main() {
     std::chrono::duration<double> naiveTime = naiveMult(matA, matB, matC);
 
     //Run and time the parallel naive implementation
-    std::chrono::duration<double> parallelNaiveTime = parallelNaiveMult(matA, matB, matC);
+    std::chrono::duration<double> parallelNaiveTime = parallelNaiveMult(matA, matB, matC1);
 
     //Run and time tiled implementation
-    std::chrono::duration<double> tiledTime = tiledMult(matA, matB, matC);
+    std::chrono::duration<double> tiledTime = tiledMult(matA, matB, matC2);
 
     //Run and time our implementation
-    std::chrono::duration<double> customTime = customMult(matA, matB, matC);
+    std::chrono::duration<double> customTime = customMult(matA, matB, matC3);
+
+    std::cout << std::boolalpha << "N v P " << compare2(matC, matC1) << std::endl;
+    std::cout << std::boolalpha << "N v T " << compare2(matC, matC2) << std::endl;
+    std::cout << std::boolalpha << "N v C " << compare2(matC, matC3) << std::endl;
 
     //Display the results
     //displayMatrices(matA, matB, matC);
