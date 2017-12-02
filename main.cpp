@@ -60,7 +60,7 @@ std::chrono::duration<double> tiledMult(int *mA, int *mB, int *result){
 }
 
 std::chrono::duration<double> customMult(int *mA, int *mB, int *result){
-    //Do the multiplication C = A * B (tiled implementation)
+    //Do the multiplication C = A * B (custom implementation)
     int tileSize = 64;
     auto sTime = std::chrono::steady_clock::now(); //start timer
     #pragma omp parallel for schedule(guided)
@@ -121,19 +121,26 @@ int main() {
     int *matC1 = new int[MAT_ROWS*MAT_COLS];
     int *matC2 = new int[MAT_ROWS*MAT_COLS];
     int *matC3 = new int[MAT_ROWS*MAT_COLS];
+    int *matBTrans = new int[MAT_ROWS*MAT_COLS];
 
     srand(time(NULL));
 
+    std::cout << "Initializing matrices..." << std::endl;
+
     //Fill matrices with random values between 1 and 20, or 0 for result matrix
+    #pragma omp parallel for schedule(guided)
     for(int i = 0; i < MAT_ROWS; i++){
         for(int j = 0; j < MAT_COLS; j++){
             int valA = rand() % 20 + 1;
             int valB = rand() % 20 + 1;
             matA[i*MAT_COLS+j] = valA;
             matB[i*MAT_COLS+j] = valB;
+            matBTrans[j*MAT_COLS+i] = valB;
             matC[i*MAT_COLS+j] = 0;
         }
     }
+
+    std::cout << "Performing multiplications..." << std::endl;
 
     //Run and time the naive implementation
     std::chrono::duration<double> naiveTime = naiveMult(matA, matB, matC);
