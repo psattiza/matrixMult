@@ -4,8 +4,8 @@
 #include <stdio.h>
 #include <immintrin.h>
 
-#define MAT_ROWS 1024
-#define MAT_COLS 1024
+#define MAT_ROWS 256
+#define MAT_COLS 256
 
 std::chrono::duration<double> naiveMult(int *mA, int *mB, int *result){
     //Do the multiplication C = A * B (naive implementation)
@@ -106,7 +106,7 @@ std::chrono::duration<double> customMult(int (&mA)[MAT_ROWS][MAT_COLS], int (&mB
     unsigned int mc = MAT_COLS;
     size_t s1 = std::min(512u, mc);
     size_t s2 = std::min(24u, mc);
-
+    #pragma omp parallel for schedule(guided)
     for(size_t jj = 0; jj < mc; jj+=s1){
         for(size_t kk = 0; kk < mc; kk+=s2){
             //loop unrolling by factor of two
@@ -243,9 +243,9 @@ int main() {
     std::cout << "Computation time (transpose naive): " << naiveTransposeTime.count() << "s" << std::endl;
 
     //Run and time the parallel naive implementation
-    std::cout << "Using parallel naive..." << std::endl;
-    std::chrono::duration<double> parallelNaiveTime = parallelNaiveMult(matA, matB, matC1);
-    std::cout << "Computation time (parallel naive): " << parallelNaiveTime.count() << "s" << std::endl;
+    //std::cout << "Using parallel naive..." << std::endl;
+    //std::chrono::duration<double> parallelNaiveTime = parallelNaiveMult(matA, matB, matC1);
+    //std::cout << "Computation time (parallel naive): " << parallelNaiveTime.count() << "s" << std::endl;
 
     //Run and time tiled implementation
     std::cout << "Using tiled..." << std::endl;
